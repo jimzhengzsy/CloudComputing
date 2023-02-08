@@ -1,0 +1,94 @@
+Grading A8: Persisting Data in a KVS
+
+Grader's Name: Jiamao Zheng
+
+Ex.1(a)
+- [] Not sending a POST with body data including the job ID
+- [] Database PUT missing "job_id"
+- [] Database PUT missing "user_id"
+- [] Database PUT missing "input_file_name"
+- [] Database PUT missing "s3_inputs_bucket"
+- [] Database PUT missing "S3_key_input_file"
+- [] Database PUT missing "submit_time"
+- [] Database PUT missing "job_status" as "PENDING"
+
+Ex.1(b)
+- [] Not redirecting back to new route on web server
+
+Ex.2
+- [] Route not using a POST
+- [x] Not passing job_id to a8_run.py as part of the Popen() call
+- [] Using a blocking call to spawn a8_run.py (this is old news by now!)
+- [] Not updating job_status in database with “RUNNING”
+- [] Updating database status before spawning subprocess
+
+Ex.3
+- [] Not copying results file (to correct location) on S3
+- [] Not copying log file (to correct location) S3
+- [] Status in database is not updated to "COMPLETED"
+- [x] Database missing any of "s3_results_bucket", "s3_key_result_file",
+     "s3_key_log_file", and "complete_time"
+
+     missed to implement these two variables - 
+
+     key_result_file, key_log_file = '', ''
+
+- [] Overwriting item with put_item() instead of update_item()
+- [] Not removing all local files after copying them to S3
+
+Ex.4
+- [] Annotator not doing a conditional update
+
+* References (check one)
+- [x] Specific references provided => "O"
+- [] Only generic references provided => "S"
+- [] No references provided => "U"
+
+Code Review/Other Notes:
+
+Good work!
+
+Missed error handling for:
+
+1) ann_job_response = requests.post("http://songyuanzheng-a8-ann.ucmpcs.org:5000/annotations", json=data)
+
+For example, 
+
+error_response = {
+               'code': 500,
+               'status': 'error',
+               'message': f'An error occur when sending the job to the annotator. {e}'
+           }
+
+try:
+    ann_job_response = requests.post("http://songyuanzheng-a8-ann.ucmpcs.org:5000/annotations", json=data)
+except requests.exceptions.RequestException as e:
+    return error_response, 500
+except exception as e: 
+    return error_response, 500
+
+
+if not ann_job_response.ok:
+    return (
+        jsonify(
+            {
+                "code": 500,
+                "status": "error",
+                "message": f"Failed to submit job: {ann_job_response.json()['message']}",
+            }
+        ),
+        500,
+    )
+
+
+2) shutil.rmtree(folder_path)
+
+For example, 
+
+try: 
+      shutil.rmtree(folder_path)
+  except OSError as e:
+      print("Error while removing job directory: %s - %s." % (e.filename, e.strerror))
+
+
+Grade: S

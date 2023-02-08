@@ -1,0 +1,28 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+  </head>
+  <body>	
+    <h1>Upload VCF File</h1>
+    <form id="upload_form" 
+      action={{ data['url'] }} method="post"
+      enctype="multipart/form-data">
+
+
+
+      <!-- https://jinja.palletsprojects.com/en/3.1.x/templates/#for -->
+        <!-- Examples in document -->
+      {% for key, value in data['fields'].items() %}
+          <input type="hidden" name="{{ key }}" value="{{ value }}">
+      {% endfor %}
+
+	<!-- Use the browser source code view to see what was generated  -->
+      ......
+      Select input file: <input id="upload_file" type="file" name="file" />
+      <input type="submit" value="Upload Input File" />
+    </form>
+  </body>
+</html>
+

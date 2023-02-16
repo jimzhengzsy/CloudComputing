@@ -19,10 +19,11 @@ from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
 from flask import (abort, flash, redirect, render_template, 
-  request, session, url_for)
+  request, session, url_for, jsonify)
 
 from app import app, db
 from decorators import authenticated, is_premium
+import logging
 
 """Start annotation request
 Create the required AWS S3 policy document and render a form for
@@ -94,19 +95,73 @@ homework assignments
 def create_annotation_job_request():
 
   region = app.config['AWS_REGION_NAME']
+  table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
+  topic = app.config['AWS_SNS_ARN_TOPIC_A10']
 
   # Parse redirect URL query parameters for S3 object info
-  bucket_name = request.args.get('bucket')
+  # From Example of The Request Object
+  # https://flask.palletsprojects.com/en/2.2.x/quickstart/#a-minimal-application
+  # https://flask.palletsprojects.com/en/2.2.x/api/#flask.Request
+  # Get bucket name, key, and job ID from the S3 redirect URL
+  bucket = request.args.get('bucket')
   s3_key = request.args.get('key')
 
-  # Extract the job ID from the S3 key
-  # Move your code here
+
+  # Extract job_id and filename from the key
+  arr = s3_key.split('/',2)
+  index = arr[2].index('~')
+  user_id = arr[1]
+  job_id = arr[2][:index]
+  filename = arr[2][index+1:]
 
   # Persist job to database
-  # Move your code here...
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.put_item
+  # Example of the format of item
+  # Create a job item and persist it to the annotations database
+  data = {  
+          "job_id": {'S': job_id},
+          "user_id": {'S': user_id},
+          "input_file_name": {'S': filename},
+          "s3_inputs_bucket": {'S': bucket},
+          "s3_key_input_file": {'S': s3_key},
+          "submit_time": {'N': str(current_epoch_time())},
+          "job_status": {'S': 'PENDING'}
+       }    
+
+  client = boto3.client('dynamodb', region_name=region)
+  try:
+      client.put_item(TableName=table_name,Item=data)
+  except ClientError as e:
+      logging.error(e)
+      error = {
+        'code': 500,
+        'status': 'error',
+        'message': "Fail to update data to dynamodb"
+      }
+
+      return jsonify(error), 500
 
   # Send message to request queue
-  # Move your code here...
+  # publish a notification message to SNS
+  # Ref:
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sns.html#SNS.Client.publish
+  # https://stackoverflow.com/questions/34029251/aws-publish-sns-message-for-lambda-function-via-boto3-python2
+  # https://github.com/aws-samples/amazon-rekognition-video-analyzer/issues/41
+  sns = boto3.client('sns', region_name=region)
+  try:
+      resp = sns.publish(
+          TopicArn=topic,
+          Message=json.dumps(data)
+      )
+  except ClientError as e:
+      logging.error(e)
+      error = {
+        'code': 500,
+        'status': 'error',
+        'message': "Fail to publish message to SNS"
+      }
+
+      return jsonify(error), 500
 
   return render_template('annotate_confirm.html', job_id=job_id)
 
@@ -168,7 +223,11 @@ def subscribe():
     # Display confirmation page
     pass
 
-
+'''
+helper functions
+'''
+def current_epoch_time():
+    return int(time.time())
 """Set premium_user role
 """
 @app.route('/make-me-premium', methods=['GET'])

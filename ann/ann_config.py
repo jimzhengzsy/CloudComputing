@@ -10,6 +10,11 @@ __author__ = 'Vas Vasiliadis <vas@uchicago.edu>'
 
 class Config(object):
 
+  # Get configuration
+  from configparser import ConfigParser
+  config = ConfigParser(os.environ)
+  config.read('app_config.ini')
+
   CSRF_ENABLED = True
 
   ANNOTATOR_BASE_DIR = "/home/ubuntu/gas/ann/"
@@ -28,6 +33,12 @@ class Config(object):
   AWS_SQS_MAX_MESSAGES = 10
 
   # AWS DynamoDB
-  AWS_DYNAMODB_ANNOTATIONS_TABLE = "<CNetID>_annotations"
+  AWS_DYNAMODB_ANNOTATIONS_TABLE = "songyuanzheng_annotations"
+
+  # AWS SNS topic for A10
+  AWS_SNS_ARN_TOPIC_A10 = 'arn:aws:sqs:us-east-1:127134666975:songyuanzheng_a10_job_requests'
+
+  # AWS SQS queue for A10
+  AWS_SQS_Queue_NAME_A10 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a10_job_requests'
 
 ### EOF

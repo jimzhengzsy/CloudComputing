@@ -35,15 +35,21 @@ class Timer(object):
             print(f"Approximate runtime: {self.secs:.2f} seconds")
 
 
-bucket_name = 'gas-results'
-cnet_id = 'songyuanzheng'
 
 def current_epoch_time():
     t = time.time()
     return int(t)
 
+bucket_name = config['s3']['Result_Bucket']
+cnet_id = 'songyuanzheng'
+
 
 if __name__ == '__main__':
+    config = ConfigParser(os.environ)
+    config.read('ann_config.ini')
+    region = config['aws']['AwsRegionName']
+
+
     # Call the AnnTools pipeline
     if len(sys.argv) > 1:
         with Timer():
@@ -56,7 +62,7 @@ if __name__ == '__main__':
         arr = file_path.split('/')
         folder_path = f"annotation_jobs/{job_id}"
         input_file = arr[2]
-        client = boto3.resource('s3', region_name='us-east-1')
+        client = boto3.resource('s3', region_name=region)
         key_result_file, key_log_file = '', ''
         # 1. Upload the results file to S3 results bucket
         # 2. Upload the log file to S3 results bucket
@@ -84,7 +90,7 @@ if __name__ == '__main__':
         except OSError as e:
             print("Error while removing job directory: %s - %s." % (e.filename, e.strerror))
         # 4. Update 
-        dynamoDB = boto3.client('dynamodb', region_name='us-east-1')
+        dynamoDB = boto3.client('dynamodb', region_name=region)
         update_exp = 'SET s3_results_bucket = :bucket, s3_key_result_file = :result_file, ' \
                      's3_key_log_file = :log_file, complete_time = :time, job_status = :status'
         try:
@@ -104,5 +110,20 @@ if __name__ == '__main__':
         except ClientError as error:
             logging.error(e)
             print(error)
+        # 5. publish a notification that job is finished
+        msg = {
+            'user_id': user_id,
+            'job_id': job_id,
+            'complete_time': str(current_epoch_time())
+        }
+        sns = boto3.client('sns', region_name=region)
+        try:
+            sns.publish(
+                TopicArn=config['sns']['AWS_SNS_ARN_TOPIC'],
+                Message=json.dumps(msg)
+            )
+        except ClientError as e:
+            print(f'Fail to post message to sns: {e}')
+
     else:
         print("A valid .vcf file must be provided as input to this program.")

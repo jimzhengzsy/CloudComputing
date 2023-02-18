@@ -11,7 +11,7 @@ __author__ = 'Vas Vasiliadis <vas@uchicago.edu>'
 import uuid
 import time
 import json
-from datetime import datetime
+from datetime import datetime, timedelta, timezone
 
 import boto3
 from botocore.client import Config
@@ -132,14 +132,8 @@ def create_annotation_job_request():
   try:
       client.put_item(TableName=table_name,Item=data)
   except ClientError as e:
-      logging.error(e)
-      error = {
-        'code': 500,
-        'status': 'error',
-        'message': "Fail to update data to dynamodb"
-      }
-
-      return jsonify(error), 500
+      app.logger.error(f'Fail to update data to dynamodb: {e}')
+      return abort(500)
 
   # Send message to request queue
   # publish a notification message to SNS
@@ -173,25 +167,122 @@ def create_annotation_job_request():
 def annotations_list():
 
   # Get list of annotations to display
-  
-  return render_template('annotations.html', annotations=None)
+  region = app.config['AWS_REGION_NAME']
+  table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
+  table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
+  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
+  query_fields = 'job_id,submit_time,input_file_name,job_status'
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.query
+  # Example of query
+  dynamodb = boto3.client('dynamodb', region_name=region)
+  try:
+    response = dynamodb.query(
+            TableName=table_name,
+            IndexName=table_index,
+            ProjectionExpression=query_fields,
+            KeyConditionExpression='user_id = :v1',
+            ExpressionAttributeValues={':v1': {'S': get_user_id()}}
+      )
+  except ClientError as e:
+    app.logger.error(f'Fail to query annotations from dynamodb: {e}')
+
+    return abort(500)
+
+  items = response['Items']
+  for item in items:
+    item['job_id']['link'] = f"{request.url}/{item['job_id']['S']}"
+    item['submit_time']['N'] = parse_timestamp(item['submit_time']['N'])
+  return render_template('annotations.html', annotations=items)
 
 
 """Display details of a specific annotation job
 """
-@app.route('/annotations/<id>', methods=['GET'])
+@app.route('/annotations/<job_id>', methods=['GET'])
 @authenticated
-def annotation_details(id):
-  pass
+def annotation_details(job_id):
+  region = app.config['AWS_REGION_NAME']
+  table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
+  table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
+  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
+
+  dynamodb = boto3.client('dynamodb', region_name=region)
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
+  # Examples of get_item
+  try:
+    response = dynamodb.get_item(
+          TableName=table_name,
+          Key={'job_id': {'S':job_id}}
+      )
+  except ClientError as e:
+    app.logger.error(f'Fail to query annotation job {job_id}from dynamodb: {e}')
+
+    return abort(500)
+
+  job_item = response['Item']
+
+  if job_item['user_id']['S'] != get_user_id():
+    app.logger.error(f'You are not authorized user for this annotation job {job_id}: {e}')
+    return abort(403)
+
+  job_data = {
+    'Request ID:': {'val': job_item['job_id']['S']},
+    'Request Time:': {'val': parse_timestamp(job_item['submit_time']['N'])},
+    'VCF Input File:': {'val': job_item['input_file_name']['S'], 
+                        'link': generate_download_link(job_item['s3_inputs_bucket']['S'], job_item['s3_key_input_file']['S'])},
+    'Status:': {'val': job_item['job_status']['S']}
+  }
+  if job_item['job_status']['S'] == 'COMPLETED':
+    job_data['Complete Time:'] = {'val':parse_timestamp(job_item['complete_time']['N'])}
+    job_data['Annotated Results File:'] = {'val': 'download', 
+                                          'link': generate_download_link(job_item['s3_inputs_bucket']['S'],
+                                                                         job_item['s3_key_input_file']['S'])}
+    job_data['Annotation Log File:'] = {'val': 'view', 'link':f'{request.url}/log'}
+  return render_template('annotation.html', job_data=job_data)
 
 
 """Display the log file contents for an annotation job
 """
-@app.route('/annotations/<id>/log', methods=['GET'])
+@app.route('/annotations/<job_id>/log', methods=['GET'])
 @authenticated
-def annotation_log(id):
-  pass
+def annotation_log(job_id):
+  region = app.config['AWS_REGION_NAME']
+  table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
+  table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
+  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
 
+  dynamodb = boto3.client('dynamodb', region_name=region)
+  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
+  # Examples of get_item
+  try:
+    response = dynamodb.get_item(
+          TableName=table_name,
+          Key={'job_id': {'S':job_id}}
+      )
+  except ClientError as e:
+    app.logger.error(f'Fail to query annotation job {job_id}from dynamodb: {e}')
+
+    return abort(500)
+
+  job_item = response['Item']
+
+  # Check authentication
+  if job_item['user_id']['S'] != get_user_id():
+    app.logger.error(f'You are not authorized user for this annotation job {job_id}: {e}')
+    return abort(403)
+  # Check job completion
+  if job_item['job_status']['S'] != 'COMPLETED':
+    return abort(401)
+
+  bucket = job_item['s3_results_bucket']['S']
+  log_key = job_item['s3_key_log_file']['S']
+  try:
+    s3 = boto3.resource('s3', region_name=region)
+    log_object = s3.Object(bucket, log_key)
+    log = log_object.get()['Body'].read().decode('utf-8')
+  except ClientError as e:
+    app.logger.error(f'Fail to get log for job: {job_id}: {e}')
+    return abort(500)
+  return render_template('view_log.html', log=log, job_id=job_id)
 
 """Subscription management handler
 """
@@ -227,7 +318,28 @@ def subscribe():
 helper functions
 '''
 def current_epoch_time():
-    return int(time.time())
+  return int(time.time())
+
+def get_user_id():
+  return session['primary_identity']
+
+def parse_timestamp(ts):
+  ts = int(ts)
+  td = timedelta(hours=app.config['DISPLAY_TIME_ZONE'])
+  tz = timezone(td)
+  dt = datetime.fromtimestamp(ts, tz)
+  dt = dt.strftime('%Y-%m-%d %H:%M:%S')
+  return f'{dt} CST'
+
+def generate_download_link(bucket, key):
+  region = app.config['AWS_REGION_NAME']
+  s3 = boto3.client('s3', region_name=region)
+  try:
+      response = s3.generate_presigned_url('get_object', Params={'Bucket': bucket, 'Key': key})
+  except ClientError as e:
+      app.logger.error(f'Unable to generate download link: {e}')
+      return None
+  return response
 """Set premium_user role
 """
 @app.route('/make-me-premium', methods=['GET'])

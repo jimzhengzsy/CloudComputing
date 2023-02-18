@@ -19,8 +19,8 @@ def submit_annonations(job):
 
   region = config['aws']['AwsRegionName']
   table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = config['sns']['AWS_SNS_ARN_TOPIC_A10']
-  queue = config['sqs']['AWS_SQS_Queue_NAME_A10']
+  topic = config['sns']['AWS_SNS_ARN_TOPIC_A11']
+  queue = config['sqs']['AWS_SQS_QUEUE_URL_A11']
 
 
   # Extract job parameters from request body
@@ -85,8 +85,8 @@ if __name__ == "__main__":
   config.read('ann_config.ini')
   region = config['aws']['AwsRegionName']
   table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = config['sns']['AWS_SNS_ARN_TOPIC_A10']
-  queue = config['sqs']['AWS_SQS_Queue_NAME_A10']
+  topic = config['sns']['AWS_SNS_ARN_TOPIC_A11']
+  queue = config['sqs']['AWS_SQS_QUEUE_URL_A11']
   
   if not os.path.exists("annotation_jobs"):
     os.makedirs("annotation_jobs")

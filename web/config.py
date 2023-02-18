@@ -124,20 +124,26 @@ class Config(object):
   # AWS SNS topic for A10
   AWS_SNS_ARN_TOPIC_A10 = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a10_job_requests'
 
+  # AWS SNS topic for A11
+  AWS_SNS_ARN_TOPIC_A11 = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a11_job_requests'
+
   # AWS SQS queue for A10
   AWS_SQS_Queue_NAME_A10 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a10_job_requests'
+  # AWS SQS queue for A11
+  AWS_SQS_QUEUE_URL_A11 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a11_job_requests'
   # AWS SQS queues
   AWS_SQS_REQUESTS_QUEUE_NAME = ""
 
   # AWS DynamoDB table
   AWS_DYNAMODB_ANNOTATIONS_TABLE = f"{iam_username}_annotations"
-
+  AWS_DYNAMODB_ANNOTATIONS_INDEX = 'user_id_index'
   # Use this email address to send email via SES
   MAIL_DEFAULT_SENDER = f"{iam_username}@ucmpcs.org"
 
   # Time before free user results are archived (in seconds)
   FREE_USER_DATA_RETENTION = 300
-
+  # Time Zone value
+  DISPLAY_TIME_ZONE = -6
 class DevelopmentConfig(Config):
   DEBUG = True
   GAS_LOG_LEVEL = 'DEBUG'

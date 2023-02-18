@@ -14,7 +14,17 @@ University of Chicago
     </div>
 
     <!-- DISPLAY ANNOTATION JOB DETAILS -->
-
+    <!-- https://jinja.palletsprojects.com/en/3.1.x/templates/#if -->
+    {% for key, value in job_data.items() %}
+    <div>
+      <span>{{ key }}</span>
+      {% if value.link %}
+      <a href="{{ value.link }}">{{ value.val }}</a>
+      {% else %}
+      <span>{{ value.val }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
     <hr />
     <a href="{{ url_for('annotations_list') }}">&larr; back to annotations list</a>
 

@@ -21,6 +21,22 @@ University of Chicago
     </div>
 
     <!-- DISPLAY LIST OF ANNOTATION JOBS -->
+    <table class="table">
+        <tr>
+            <td>Request ID</td>
+            <td>Request Time</td>
+            <td>VCF File Name</td>
+            <td>Status</td>
+        </tr>
+        {% for item in annotations %}
+        <tr>
+            <td><a href="{{ item['job_id']['link'] }}">{{ item['job_id']['S'] }}</a></td>
+            <td>{{ item['submit_time']['N'] }}</td>
+            <td>{{ item['input_file_name']['S'] }}</td>
+            <td>{{ item['job_status']['S'] }}</td>
+        </tr>
+        {% endfor %}
+    </table>
 
   </div> <!-- container -->
 {% endblock %}

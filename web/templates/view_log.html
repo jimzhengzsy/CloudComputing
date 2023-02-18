@@ -14,9 +14,9 @@ University of Chicago
     </div>
 
     <!-- DISPLAY LOG FILE CONTENTS -->
-
+    <pre>{{ log }}</pre>
     <hr />
-    <a href="{{ url_for('annotation_details', id=job_id) }}">&larr; back to annotations details</a>
+    <a href="{{ url_for('annotation_details', job_id=job_id) }}">&larr; back to annotations details</a>
 
   </div> <!-- container -->
 {% endblock %}

@@ -13,7 +13,8 @@ import os
 import sys
 import json
 import psycopg2
-from botocore.exceptions import 
+import jmespath
+from botocore.exceptions import ClientError
 from datetime import datetime, timedelta, timezone
 
 # Import utility helpers

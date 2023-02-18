@@ -40,7 +40,7 @@ def current_epoch_time():
     t = time.time()
     return int(t)
 
-bucket_name = config['s3']['Result_Bucket']
+
 cnet_id = 'songyuanzheng'
 
 
@@ -48,6 +48,7 @@ if __name__ == '__main__':
     config = ConfigParser(os.environ)
     config.read('ann_config.ini')
     region = config['aws']['AwsRegionName']
+    bucket_name = config['s3']['Result_Bucket']
 
 
     # Call the AnnTools pipeline

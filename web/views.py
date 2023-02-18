@@ -96,7 +96,7 @@ def create_annotation_job_request():
 
   region = app.config['AWS_REGION_NAME']
   table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = app.config['AWS_SNS_ARN_TOPIC_A10']
+  topic = app.config['AWS_SNS_ARN_TOPIC']
 
   # Parse redirect URL query parameters for S3 object info
   # From Example of The Request Object
@@ -170,7 +170,7 @@ def annotations_list():
   region = app.config['AWS_REGION_NAME']
   table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
   table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
-  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
+  topic = app.config['AWS_SNS_ARN_TOPIC']
   query_fields = 'job_id,submit_time,input_file_name,job_status'
   # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.query
   # Example of query
@@ -203,7 +203,7 @@ def annotation_details(job_id):
   region = app.config['AWS_REGION_NAME']
   table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
   table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
-  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
+  topic = app.config['AWS_SNS_ARN_TOPIC']
 
   dynamodb = boto3.client('dynamodb', region_name=region)
   # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item
@@ -248,7 +248,7 @@ def annotation_log(job_id):
   region = app.config['AWS_REGION_NAME']
   table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
   table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
-  topic = app.config['AWS_SNS_ARN_TOPIC_A11']
+  topic = app.config['AWS_SNS_ARN_TOPIC']
 
   dynamodb = boto3.client('dynamodb', region_name=region)
   # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.get_item

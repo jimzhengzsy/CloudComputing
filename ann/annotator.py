@@ -26,7 +26,7 @@ def submit_annonations(job):
   # Extract job parameters from request body
   job_id = job["job_id"]['S']
   input_file_name = job['input_file_name']['S']
-  user_id = job_item['user_id']['S']
+  user_id = job['user_id']['S']
   input_bucket = job['s3_inputs_bucket']['S']
   input_file_key = job['s3_key_input_file']['S']
 

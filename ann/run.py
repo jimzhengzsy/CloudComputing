@@ -60,7 +60,7 @@ if __name__ == '__main__':
         # python Annotools/run.py {filepath}
         file_path = sys.argv[1]
         job_id = sys.argv[2]
-        user_id = sys.argv[2]
+        user_id = sys.argv[3]
         # "annotation_jobs/{annotation_job_id}/{filename}"
         arr = file_path.split('/')
         folder_path = f"annotation_jobs/{job_id}"

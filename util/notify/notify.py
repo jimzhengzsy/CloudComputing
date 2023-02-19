@@ -1,136 +1,119 @@
-from flask import Flask, request, jsonify, render_template
-from botocore.client import Config, ClientError
-import json
-import uuid
-import os
-import subprocess
+# notify.py
+#
+# Notify users of job completion
+#
+# Copyright (C) 2011-2021 Vas Vasiliadis
+# University of Chicago
+##
+__author__ = 'Vas Vasiliadis <vas@uchicago.edu>'
+
 import boto3
 import time
+import os
+import sys
+import json
+import psycopg2
 import jmespath
-import logging
+from botocore.exceptions import ClientError
+from datetime import datetime, timedelta, timezone
 
+# Import utility helpers
+sys.path.insert(1, os.path.realpath(os.path.pardir))
+import helpers
+
+# Get configuration
 from configparser import ConfigParser
+config = ConfigParser(os.environ)
+config.read('notify_config.ini')
 
-
-def submit_annonations(job):
-  # Get configuration
-  config = ConfigParser(os.environ)
-  config.read('ann_config.ini')
-
+'''Capstone - Exercise 3(d)
+Reads result messages from SQS and sends notification emails.
+'''
+def handle_results_queue(sqs=None):
   region = config['aws']['AwsRegionName']
-  table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = config['sns']['AWS_SNS_ARN_TOPIC']
-  queue = config['sqs']['AWS_SQS_QUEUE_URL']
-
-
-  # Extract job parameters from request body
-  job_id = job["job_id"]['S']
-  input_file_name = job['input_file_name']['S']
-  user_id = job['user_id']['S']
-  input_bucket = job['s3_inputs_bucket']['S']
-  input_file_key = job['s3_key_input_file']['S']
-
-  # Get the filename
-  filename = input_file_name
-  annotation_job_id = job_id
-
-  # use the file system for persistence
-  # If it's first time to create annotation jobs, create the folder annotation_jobs.
-  if not os.path.exists("annotation_jobs"):
-    os.makedirs("annotation_jobs")
-  os.makedirs(f"annotation_jobs/{annotation_job_id}")
-  file_path = f"annotation_jobs/{annotation_job_id}/{filename}"
-
-  # https://ashish.ch/generating-signature-version-4-urls-using-boto3/
-  # Initialize s3 client
-  s3 = boto3.resource('s3', region_name=region)
-  # example in download file
-  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/s3.html#S3.Client.download_file
+  queue_url = config['sqs']['SqsUrl']
+  if sqs is None:
+    sqs = boto3.client('sqs', region_name=region)
+  # Read a message from the queue
   try:
-    s3.meta.client.download_file(input_bucket, input_file_key, file_path)
-  except ClientError as error:
+    response = sqs.receive_message(
+         QueueUrl=queue_url,
+         WaitTimeSeconds=20 
+      )
+  except ClientError as e:
+      print(f'Fail to receive message from sqs: {e}')
+      return
 
-    logging.error(e)
-    return False
+  response = jmespath.search('Messages[*].{handle: ReceiptHandle, body: Body}', response)
+  if response is None:
+      return
 
-  # Spawn a subprocess to run the annotator using the provided input file.
-  # https://docs.python.org/3/library/subprocess.html
-  try:
-    subprocess.Popen(["python","run.py", f"{file_path}", f"{annotation_job_id}", f"{user_id}"])
-  except Exception as e:
-    logging.error(e)
-    return False
-
-  # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.update_item
-  # https://stackoverflow.com/questions/63418641/dynamodb-boto3-conditional-update
-  # Update the job status in dynamoDB
-  client = boto3.client('dynamodb',region_name=region)
-  try:
-    client.update_item(TableName=table_name,
-                       Key={'job_id': {'S': job_id}},
-                       UpdateExpression='SET job_status = :newVal',
-                       ConditionExpression='job_status = :oldVal',
-                       ExpressionAttributeValues={
-                           ':newVal': {'S': 'RUNNING'},
-                           ':oldVal': {'S': 'PENDING'}
-                       })
-  except Exception as e:
-    logging.error(e)
-    return False
-
-  return True
-
-if __name__ == "__main__":
-  config = ConfigParser(os.environ)
-  config.read('ann_config.ini')
-  region = config['aws']['AwsRegionName']
-  table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = config['sns']['AWS_SNS_ARN_TOPIC']
-  queue = config['sqs']['AWS_SQS_QUEUE_URL']
-  
-  if not os.path.exists("annotation_jobs"):
-    os.makedirs("annotation_jobs")
-  # Connect to SQS and get the message queue
-  sqs = boto3.client('sqs', region_name=region)
-  # Poll the message queue in a loop 
-  while True:
-      # https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-short-and-long-polling.html
-      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html#SQS.Client.receive_message
-
-      # Attempt to read a message from the queue
-      # Use long polling - DO NOT use sleep() to wait between polls
+  for message in response:
       try:
-          resp = sqs.receive_message(
-              QueueUrl=queue,
-              WaitTimeSeconds=20
-          )
-      except ClientError as e:
-          logging.error(e)
-          continue
-
-      response = jmespath.search('Messages[*].{handle: ReceiptHandle, body: Body}', resp)
-
-      if response is None:
-        continue
-
-      for message in response:
-        try:
           data = json.loads(message['body'])
-          job_item = json.loads(data['Message'])
-        except Exception as e:
-          logging.error(e)
-
-
-      
-      # Delete the message from the queue, if job was successfully submitted
-      status = submit_annonations(job_item)
-      if not status:
+          data = json.loads(data['Message'])
+      except json.decoder.JSONDecodeError as e:
+          print(f'Fail to decode message: {message["body"]} {e}')
           continue
-      # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html#SQS.Client.delete_message
+      # Process message
+      if 'job_id' not in data or 'user_id' not in data or \
+              'complete_time' not in data:
+          print(f'Invalid message ')
+          continue
+      print(data)
+      job_id = data['job_id']
+      user_id = data['user_id']
+      print(f"user_id:{user_id}")
+      complete_time = parse_timestamp(data['complete_time'])
+
+      link = f"{config['gas']['GasAnnotation']}/{job_id}"
+
+      subject = config['email']['Subject'] % job_id
+      body = config['email']['Body'] % (complete_time, link)
+
+      try:
+          user_profile = {}
+          user_profile = helpers.get_user_profile(user_id,)
+          if user_profile == {}:
+            print('User profile is not found')
+            continue
+          print(user_profile)
+          helpers.send_email_ses(
+              recipients=user_profile['email'],
+              subject=subject,
+              body=body
+          )
+      except Exception as e:
+          print(f'Fail to get user profile or send email: {e}')
+          print(user_profile)
+
+      # Delete message
       try:
           response = sqs.delete_message(
-              QueueUrl=queue,
+              QueueUrl=queue_url,
               ReceiptHandle=message['handle']
           )
       except ClientError as e:
-          logging.error(e)
+          print(f'Fail to delete message from sqs: {e}')
+
+
+
+def parse_timestamp(ts):
+    ts = int(ts)
+    td = timedelta(hours=-6)
+    tz = timezone(td)
+    dt = datetime.fromtimestamp(ts, tz)
+    dt = dt.strftime('%Y-%m-%d %H:%M:%S')
+    return f'{dt} CST'
+
+
+if __name__ == '__main__':
+  
+  # Get handles to resources; and create resources if they don't exist
+  region = config['aws']['AwsRegionName']
+  sqs = boto3.client('sqs', region_name=region)
+  # Poll queue for new results and process them
+  while True:
+    handle_results_queue(sqs=sqs)
+
+### EOF

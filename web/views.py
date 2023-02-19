@@ -108,11 +108,7 @@ def create_annotation_job_request():
 
 
   # Extract job_id and filename from the key
-  arr = s3_key.split('/',2)
-  index = arr[2].index('~')
-  user_id = arr[1]
-  job_id = arr[2][:index]
-  filename = arr[2][index+1:]
+  user_id, job_id, filename = parse_s3_key(s3_key)
 
   # Persist job to database
   # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/dynamodb.html#DynamoDB.Client.put_item
@@ -127,7 +123,6 @@ def create_annotation_job_request():
           "submit_time": {'N': str(current_epoch_time())},
           "job_status": {'S': 'PENDING'}
        }    
-
   client = boto3.client('dynamodb', region_name=region)
   try:
       client.put_item(TableName=table_name,Item=data)
@@ -156,7 +151,6 @@ def create_annotation_job_request():
       }
 
       return jsonify(error), 500
-
   return render_template('annotate_confirm.html', job_id=job_id)
 
 
@@ -330,7 +324,15 @@ def parse_timestamp(ts):
   dt = datetime.fromtimestamp(ts, tz)
   dt = dt.strftime('%Y-%m-%d %H:%M:%S')
   return f'{dt} CST'
-
+def parse_s3_key(key: str):
+    # prefix/user_id/job_id~filename
+    arr = key.split('/', 2)
+    user_id = arr[1]
+    idx = arr[2].index('~')
+    job_id = arr[2][:idx]
+    filename = arr[2][idx+1:]
+    return user_id, job_id, filename
+    
 def generate_download_link(bucket, key):
   region = app.config['AWS_REGION_NAME']
   s3 = boto3.client('s3', region_name=region)

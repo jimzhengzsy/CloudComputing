@@ -19,17 +19,34 @@ def submit_annonations(job):
 
   region = config['aws']['AwsRegionName']
   table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
-  topic = config['sns']['AWS_SNS_ARN_TOPIC']
-  queue = config['sqs']['AWS_SQS_QUEUE_URL']
 
+  if job is None:
+    return False
+  job_id = ''
+  input_file_name = ''
+  user_id = ''
+  input_file_key = ''
+  input_bucket = ''
 
   # Extract job parameters from request body
-  job_id = job["job_id"]['S']
-  input_file_name = job['input_file_name']['S']
-  user_id = job['user_id']['S']
-  input_bucket = job['s3_inputs_bucket']['S']
-  input_file_key = job['s3_key_input_file']['S']
+  # TypeError occur sometimes but not affect annotation works.
+  
+  try:
+    job_id = job['job_id']['S']
+    input_file_name = job['input_file_name']['S']
+    user_id = job['user_id']['S']
+    input_bucket = job['s3_inputs_bucket']['S']
+    input_file_key = job['s3_key_input_file']['S']
+  except Exception as e:
+    logging.error(e)
+    return False
 
+
+  if job_id is None or input_file_name is None or user_id is None:
+    print("job_item is not complete")
+    print(job)
+    return False
+  # The job is complete
   # Get the filename
   filename = input_file_name
   annotation_job_id = job_id
@@ -38,7 +55,8 @@ def submit_annonations(job):
   # If it's first time to create annotation jobs, create the folder annotation_jobs.
   if not os.path.exists("annotation_jobs"):
     os.makedirs("annotation_jobs")
-  os.makedirs(f"annotation_jobs/{annotation_job_id}")
+  if not os.path.exists(f"annotation_jobs/{annotation_job_id}"):
+    os.makedirs(f"annotation_jobs/{annotation_job_id}")
   file_path = f"annotation_jobs/{annotation_job_id}/{filename}"
 
   # https://ashish.ch/generating-signature-version-4-urls-using-boto3/
@@ -83,6 +101,7 @@ def submit_annonations(job):
 if __name__ == "__main__":
   config = ConfigParser(os.environ)
   config.read('ann_config.ini')
+
   region = config['aws']['AwsRegionName']
   table_name = config['dynamodb']['AWS_DYNAMODB_ANNOTATIONS_TABLE']
   topic = config['sns']['AWS_SNS_ARN_TOPIC']
@@ -110,22 +129,43 @@ if __name__ == "__main__":
 
       response = jmespath.search('Messages[*].{handle: ReceiptHandle, body: Body}', resp)
 
-      if response is None:
-        continue
 
+      if response is None:
+
+        print("Response is empty, waiting for sqs receive message")
+        continue
       for message in response:
         try:
           data = json.loads(message['body'])
           job_item = json.loads(data['Message'])
-        except Exception as e:
-          logging.error(e)
+          print('')
+          print(f"Job_item received from annotator:{job_item}")
+          print('')
+        except json.decoder.JSONDecodeError as e:
+            print(f'Fail to decode message: {message["body"]} {e}')
+            continue
 
 
       
       # Delete the message from the queue, if job was successfully submitted
+      if 'job_id' not in job_item or 'user_id' not in job_item:
+        print("job_item is not complete")
+        print(job_item)
+        continue
+
+      if job_item is None:
+        print('job_item is None')
+        continue
+
+      print('')
+      print(f"Job_item received from annotator before submit_annonations:{job_item}")
+      print('')
       status = submit_annonations(job_item)
       if not status:
           continue
+      print('')
+      print(f"Job_item received from annotator submit_annonations :{job_item}")
+      print('')
       # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html#SQS.Client.delete_message
       try:
           response = sqs.delete_message(

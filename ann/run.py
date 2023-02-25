@@ -14,7 +14,7 @@ import time
 import driver
 import shutil
 import json
-
+import logging
 import boto3
 from botocore.client import ClientError
 from configparser import ConfigParser
@@ -45,8 +45,7 @@ def current_epoch_time():
 
 cnet_id = 'songyuanzheng'
 
-
-if __name__ == '__main__':
+def main():
     config = ConfigParser(os.environ)
     config.read('ann_config.ini')
     region = config['aws']['AwsRegionName']
@@ -130,3 +129,5 @@ if __name__ == '__main__':
 
     else:
         print("A valid .vcf file must be provided as input to this program.")
+if __name__ == '__main__':
+    main()

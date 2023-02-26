@@ -157,15 +157,9 @@ if __name__ == "__main__":
         print('job_item is None')
         continue
 
-      print('')
-      print(f"Job_item received from annotator before submit_annonations:{job_item}")
-      print('')
       status = submit_annonations(job_item)
       if not status:
           continue
-      print('')
-      print(f"Job_item received from annotator submit_annonations :{job_item}")
-      print('')
       # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/sqs.html#SQS.Client.delete_message
       try:
           response = sqs.delete_message(

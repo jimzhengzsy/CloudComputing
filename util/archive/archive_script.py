@@ -56,10 +56,13 @@ def handle_archive_queue(sqs=None):
     try:
       data = json.loads(message['body'])
       data = json.loads(data['Message'])
+      data = json.loads(data['notification']['message'])
     except json.decoder.JSONDecodeError as e:
       print(f'Fail to decode message: {message["body"]} {e}')
       continue
     # process message
+
+    print(f"The data is {data}")
     user_id = data['user_id']
     if not is_free_user(user_id):
       print('It is a premium user')
@@ -122,7 +125,7 @@ def is_free_user(user_id):
     except Exception as e:
         print(f'Fail to get user profile: {e}')
         return False
-    return profile[config['app']['UserRoleField']] == config['app']['UserFreeUser']
+    return profile['role'] == 'free_user'
 
 def main():
     # Get handles to resources; and create resources if they don't exist

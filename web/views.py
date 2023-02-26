@@ -240,7 +240,7 @@ def annotation_details(job_id):
   
     job_results['Annotation Log File'] = {
         'val': 'view', 'link': f'{request.url}/log'}
-  return render_template('annotation.html', job_data=job_data)
+  return render_template('annotation.html', job_data=job_data, job_results=job_results)
 
 
 """Display the log file contents for an annotation job

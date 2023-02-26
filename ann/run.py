@@ -130,7 +130,7 @@ def main():
             print(f'Fail to post message to sns: {e}')
         # 6. trigger data archive for free users
         msg = {
-            'bucket': config['s3']['UploadBucket'],
+            'bucket': bucket_name,
             'filename': key_result_file,
             'user_id': user_id,
             'job_id': job_id
@@ -138,7 +138,7 @@ def main():
         data = {
             'seconds': config['sfn']['AVAILABLE_TIME'],
             'notification': {
-                'topic': config['sns']['SNSArchiveTopic'],
+                'topic': config['sns']['SNS_ARCHIVE_TOPIC'],
                 'message': json.dumps(msg)
             }
         }
@@ -150,7 +150,7 @@ def main():
         sfn = boto3.client('stepfunctions', region_name=config['aws']['AwsRegionName'])
         try:
             sfn.start_execution(
-                stateMachineArn=config['sfn']['ArchiveStepFunction'],
+                stateMachineArn=config['sfn']['ARCHIVE_STEP_FUNCTION'],
                 name=job_id,
                 input=json.dumps(data)
             )

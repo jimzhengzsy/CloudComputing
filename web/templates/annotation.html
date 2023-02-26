@@ -25,6 +25,21 @@ University of Chicago
       {% endif %}
     </div>
     {% endfor %}
+
+    {% if job_results %}
+    <hr />
+    {% for key, value in job_results.items() %}
+    <div>
+      <span>{{ key }}</span>
+      {% if value.link %}
+      <a href="{{ value.link }}">{{ value.val }}</a>
+      {% else %}
+      <span>{{ value.val }}</span>
+      {% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+
     <hr />
     <a href="{{ url_for('annotations_list') }}">&larr; back to annotations list</a>
 

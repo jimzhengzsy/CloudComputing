@@ -37,7 +37,10 @@ class Config(object):
 
   # AWS SNS topic for A10
   AWS_SNS_ARN_TOPIC_A10 = 'arn:aws:sqs:us-east-1:127134666975:songyuanzheng_a10_job_requests'
-
+  # AWS SNS topic
+  AWS_SNS_ARN_TOPIC = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a14_job_requests'
+  # AWS SQS queue 
+  AWS_SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a14_job_requests'
   # AWS SQS queue for A10
   AWS_SQS_Queue_NAME_A10 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a10_job_requests'
 

@@ -14,6 +14,7 @@ import time
 import driver
 import shutil
 import json
+import logging
 
 import boto3
 from botocore.client import ClientError
@@ -45,12 +46,12 @@ def current_epoch_time():
 
 cnet_id = 'songyuanzheng'
 
-
-if __name__ == '__main__':
+def main():
     config = ConfigParser(os.environ)
     config.read('ann_config.ini')
     region = config['aws']['AwsRegionName']
     bucket_name = config['s3']['Result_Bucket']
+
 
 
     # Call the AnnTools pipeline
@@ -127,6 +128,36 @@ if __name__ == '__main__':
             )
         except ClientError as e:
             print(f'Fail to post message to sns: {e}')
+        # 6. trigger data archive for free users
+        msg = {
+            'bucket': config['s3']['UploadBucket'],
+            'filename': key_result_file,
+            'user_id': user_id,
+            'job_id': job_id
+        }
+        data = {
+            'seconds': config['sfn']['AVAILABLE_TIME'],
+            'notification': {
+                'topic': config['sns']['SNSArchiveTopic'],
+                'message': json.dumps(msg)
+            }
+        }
+        # Ref:
+        # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/stepfunctions.html#SFN.Client.start_execution
+        # https://hands-on.cloud/working-with-step-functions-in-python-using-boto3/#h-execute-step-functions-workflow
+        sfn = boto3.client('stepfunctions', region_name=config['aws']['AwsRegionName'])
+        try:
+            sfn.start_execution(
+                stateMachineArn=config['sfn']['ArchiveStepFunction'],
+                name=job_id,
+                input=json.dumps(data)
+            )
+        except ClientError as e:
+            print(f'Fail to trigger step function: {e}')
+
 
     else:
         print("A valid .vcf file must be provided as input to this program.")
+
+if __name__ == '__main__':
+  main()

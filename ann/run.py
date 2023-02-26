@@ -145,6 +145,8 @@ def main():
         # Ref:
         # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/stepfunctions.html#SFN.Client.start_execution
         # https://hands-on.cloud/working-with-step-functions-in-python-using-boto3/#h-execute-step-functions-workflow
+        # https://hands-on.cloud/aws-step-functions-tutorial/
+        # Examples from the code of step functions
         sfn = boto3.client('stepfunctions', region_name=config['aws']['AwsRegionName'])
         try:
             sfn.start_execution(

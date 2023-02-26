@@ -225,12 +225,21 @@ def annotation_details(job_id):
                         'link': generate_download_link(job_item['s3_inputs_bucket']['S'], job_item['s3_key_input_file']['S'])},
     'Status:': {'val': job_item['job_status']['S']}
   }
+  job_results = {}
   if job_item['job_status']['S'] == 'COMPLETED':
     job_data['Complete Time:'] = {'val':parse_timestamp(job_item['complete_time']['N'])}
-    job_data['Annotated Results File:'] = {'val': 'download', 
-                                          'link': generate_download_link(job_item['s3_inputs_bucket']['S'],
-                                                                         job_item['s3_key_input_file']['S'])}
-    job_data['Annotation Log File:'] = {'val': 'view', 'link':f'{request.url}/log'}
+
+    if 'results_file_archive_id' in job_item:
+      if get_user_role() == 'premium_user':
+        job_results['Annotated Results File:'] = {'val': 'file is being restored; please check back later'}
+      else:
+        job_results['Annotated Results File:'] = {'val': 'upgrade to Premium for download', 'link': '/subscribe'}
+    else:
+      job_results['Annotated Results File:'] = {'val': 'download', 'link':
+                                                generate_download_link(job_item['s3_results_bucket']['S'], job_item['s3_key_result_file']['S'])}
+  
+    job_results['Annotation Log File'] = {
+        'val': 'view', 'link': f'{request.url}/log'}
   return render_template('annotation.html', job_data=job_data)
 
 
@@ -316,7 +325,8 @@ def current_epoch_time():
 
 def get_user_id():
   return session['primary_identity']
-
+def get_user_role():
+  return session['role']
 def parse_timestamp(ts):
   ts = int(ts)
   td = timedelta(hours=app.config['DISPLAY_TIME_ZONE'])

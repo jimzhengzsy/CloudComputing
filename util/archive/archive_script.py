@@ -27,8 +27,8 @@ config = ConfigParser(os.environ)
 config.read('archive_script_config.ini')
 
 region = config['aws']['AwsRegionName']
-valt_name = config['glacier']['Vault_Name']
-wait_time = config['sqs']['Wait_Time_Seconds']
+valt_name = config['glacier']['VAULT_NAME']
+wait_time = config['sqs']['WAIT_TIME_SECONDS']
 sqs_archive_url = config['sqs']['SQS_ARCHIVE_URL']
 
 '''Capstone - Exercise 7
@@ -42,7 +42,7 @@ def handle_archive_queue(sqs=None):
   # Read a message from the queue
   try:
     resp = sqs.receive_message(
-      QueueUrl=config['sqs']['SQS_ARCHIVE_URL'],
+      QueueUrl=sqs_archive_url,
       WaitTimeSeconds=20
     )
   except ClientError as e:
@@ -69,7 +69,7 @@ def handle_archive_queue(sqs=None):
     # delete message
     try:
       response = sqs.delete_message(
-          QueueUrl=config['sqs']['SQSArchiveUrl'],
+          QueueUrl=sqs_archive_url,
           ReceiptHandle=message['handle']
       )
     except ClientError as e:
@@ -84,13 +84,12 @@ def archive(bucket, filename, job_id):
   except ClientError as e:
     print(f'Fail to download the original file {e}')
     return
-  # upload file to glacier
-  # Ref:
+  # upload the file to glacier
   # https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/glacier.html#Glacier.Client.upload_archive
   try:
     glacier = boto3.client('glacier', region_name=region)
     resp = glacier.upload_archive(
-        vaultName=config['glacier']['VaultName'],
+        vaultName=valt_name,
         body=bytes
     )
   except ClientError as e:
@@ -105,7 +104,7 @@ def archive(bucket, filename, job_id):
   # update dynamodb
   try:
     archive_id = resp['archiveId']
-    dynamodb = boto3.client('dynamodb', region_name=config['aws']['AwsRegionName'])
+    dynamodb = boto3.client('dynamodb', region_name=region)
     dynamodb.update_item(TableName=config['dynamodb']['DynamoDBAnnotationsTable'],
                         Key={'job_id': {'S': job_id}},
                         UpdateExpression='SET results_file_archive_id = :id',
@@ -130,7 +129,7 @@ def main():
     sqs = boto3.client('sqs', region_name=region)
     # Poll queue for new results and process them
     while True:
-        handle_archive_queue(sqs=sqs)
+      handle_archive_queue(sqs=sqs)
 
 if __name__ == '__main__':  
     main()

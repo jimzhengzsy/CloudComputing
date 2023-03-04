@@ -231,9 +231,9 @@ def annotation_details(job_id):
 
     if 'results_file_archive_id' in job_item:
       if get_user_role() == 'premium_user':
-        job_results['Annotated Results File:'] = {'val': 'file is being restored; please check back later'}
+        job_results['Annotated Results File:'] = {'val': 'The file is being restored; please check back later'}
       else:
-        job_results['Annotated Results File:'] = {'val': 'upgrade to Premium for download', 'link': '/subscribe'}
+        job_results['Annotated Results File:'] = {'val': 'Please upgrade to Premium for download', 'link': '/subscribe'}
     else:
       job_results['Annotated Results File:'] = {'val': 'download', 'link':
                                                 generate_download_link(job_item['s3_results_bucket']['S'], job_item['s3_key_result_file']['S'])}
@@ -295,27 +295,54 @@ from auth import update_profile
 @app.route('/subscribe', methods=['GET', 'POST'])
 @authenticated
 def subscribe():
-  if (request.method == 'GET'):
-    # Display form to get subscriber credit card info
-    pass
-    
-  elif (request.method == 'POST'):
-    # Process the subscription request
 
-    # Create a customer on Stripe
+  region = app.config['AWS_REGION_NAME']
+  table_name = app.config['AWS_DYNAMODB_ANNOTATIONS_TABLE']
+  table_index = app.config['AWS_DYNAMODB_ANNOTATIONS_INDEX']
+  job_topic = app.config['AWS_SNS_ARN_TOPIC']
+  thaw_topic = app.config['AWS_SNS_JOB_RETRIEVE_TOPIC']
 
-    # Subscribe customer to pricing plan
+  # Update user role in accounts database
+  update_profile(
+    identity_id=session['primary_identity'],
+    role='premium_user'
+  )
 
-    # Update user role in accounts database
+  # Update role in the seesion
+  session['role'] = 'premium_user'
 
-    # Update role in the session
+  # Query jobs from dynamodb
+  dynamodb = boto3.client('dynamodb', region_name=region)
+  try: 
+    resp = dynamodb.query(
+        TableName=table_name,
+        IndexName=table_index,
+        ProjectionExpression='job_id,results_file_archive_id',
+        KeyConditionExpression='user_id = :v1',
+        ExpressionAttributeValues={':v1': {'S': get_user_id()}}
+    )
+  except ClientError as e:
+    app.logger.error(f'Fail to query dynamodb: {e}')
+    abort(500)
 
-    # Request restoration of the user's data from Glacier
-    # ...add code here to initiate restoration of archived user data
-    # ...and make sure you handle files not yet archived!
+  # Find archived files
+  items = resp['Items']
+  for item in items:
+    if 'results_file_archive_id' not in item:
+      continue
+    data = {
+      'job_id': item['job_id']['S'],
+      'archive_id': item['results_file_archive_id']['S']
+    }
+    # Publish thaw message to Retrieve_Topic
+    sns = boto3.client('sns', region_name=region)
+    try:
+      sns.publish(TopicArn=thaw_topic, Message=json.dumps(data))
+    except ClientError as e:
+      app.logger.error(f'Fail to publish thaw message to SNS: {e}')
 
-    # Display confirmation page
-    pass
+  return render_template('subscribe_confirm.html', stripe_id='forced_upgrade')  
+
 
 '''
 helper functions

@@ -128,14 +128,17 @@ class Config(object):
   AWS_SNS_ARN_TOPIC_A11 = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a11_job_requests'
 
   # AWS SNS topic
-  AWS_SNS_ARN_TOPIC = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a14_job_requests'
+  AWS_SNS_ARN_TOPIC = 'arn:aws:sns:us-east-1:127134666975:songyuanzheng_a16_job_requests'
+
+  AWS_SNS_JOB_RETRIEVE_TOPIC = \
+        f"arn:aws:sns:us-east-1:127134666975:{iam_username}_a16_thaw"
 
   # AWS SQS queue for A10
   AWS_SQS_Queue_NAME_A10 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a10_job_requests'
   # AWS SQS queue for A11
   AWS_SQS_QUEUE_URL_A11 = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a11_job_requests'
   # AWS SQS queue 
-  AWS_SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a14_job_requests'
+  AWS_SQS_QUEUE_URL = 'https://sqs.us-east-1.amazonaws.com/127134666975/songyuanzheng_a16_job_requests'
   # AWS SQS queues
   AWS_SQS_REQUESTS_QUEUE_NAME = ""
 
